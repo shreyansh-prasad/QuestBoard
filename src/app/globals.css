@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply scroll-smooth;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-text-primary antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+  
+  h1 {
+    @apply text-4xl lg:text-5xl;
+  }
+  
+  h2 {
+    @apply text-3xl lg:text-4xl;
+  }
+  
+  h3 {
+    @apply text-2xl lg:text-3xl;
+  }
+  
+  a, button {
+    @apply cursor-pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition-property: color, background-color, border-color, opacity;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  button {
+    user-select: none;
+  }
+  
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  /* Hide spinner buttons on number inputs */
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+/* gentle drifting background */
+@keyframes gradientSlow {
+  0% {
+    transform: translate(0%, 0%) scale(1.02);
+    filter: blur(0px);
+  }
+  50% {
+    transform: translate(-2.5%, -2.5%) scale(1.03);
+    filter: blur(0.4px);
+  }
+  100% {
+    transform: translate(0%, 0%) scale(1.02);
+    filter: blur(0px);
+  }
+}
+
+.animate-gradientSlow {
+  background: radial-gradient(1200px 600px at 10% 30%, rgba(255,255,255,0.02), transparent 10%),
+              radial-gradient(1000px 500px at 90% 70%, rgba(255,255,255,0.015), transparent 10%),
+              linear-gradient(180deg, rgba(255,255,255,0.01), transparent 50%);
+  transform-origin: center;
+  animation: gradientSlow 20s ease-in-out infinite;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradientSlow {
+    animation: none !important;
+  }
+  .transition-all {
+    transition: none !important;
+  }
+}
+
