@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
 import AvatarEditor from "@/components/AvatarEditor";
+import { BRANCHES, SECTIONS } from "@/lib/constants";
 
 interface Profile {
   id: string;
@@ -19,6 +20,9 @@ interface FormErrors {
   bio?: string;
   displayName?: string;
   avatar?: string;
+  branch?: string;
+  section?: string;
+  year?: string;
   general?: string;
 }
 
@@ -40,6 +44,12 @@ export default function EditProfilePage() {
     displayName: "",
     avatar: null as File | null,
     hideProfile: false,
+    branch: "",
+    section: "",
+    year: "",
+    instagramUrl: "",
+    linkedinUrl: "",
+    githubUrl: "",
   });
 
   useEffect(() => {
@@ -59,16 +69,29 @@ export default function EditProfilePage() {
         return;
       }
 
-      // Fetch profile
+      // Fetch profile - check ownership first
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("username", username)
-        .eq("user_id", user.id) // Ensure user owns this profile
-        .single();
+        .maybeSingle();
 
-      if (profileError || !profile) {
-        setErrors({ general: "Profile not found or access denied" });
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        setErrors({ general: `Failed to load profile: ${profileError.message}` });
+        setLoading(false);
+        return;
+      }
+
+      if (!profile) {
+        setErrors({ general: "Profile not found" });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user owns this profile
+      if (profile.user_id !== user.id) {
+        setErrors({ general: "You can only edit your own profile" });
         setLoading(false);
         return;
       }
@@ -79,6 +102,12 @@ export default function EditProfilePage() {
         displayName: profile.display_name || "",
         avatar: null,
         hideProfile: !profile.is_public,
+        branch: profile.branch || "",
+        section: profile.section ? String(profile.section) : "",
+        year: profile.year ? String(profile.year) : "",
+        instagramUrl: (profile as any).instagram_url || "",
+        linkedinUrl: (profile as any).linkedin_url || "",
+        githubUrl: (profile as any).github_url || "",
       });
 
       setCurrentAvatarUrl(profile.avatar_url);
@@ -103,6 +132,22 @@ export default function EditProfilePage() {
       newErrors.displayName = "Display name must be less than 100 characters";
     }
 
+    // Year validation (optional, but if provided, must be 1-4)
+    if (formData.year) {
+      const yearNum = parseInt(formData.year, 10);
+      if (isNaN(yearNum) || yearNum < 1 || yearNum > 4) {
+        newErrors.year = "Year must be between 1 and 4";
+      }
+    }
+
+    // Section validation (optional, but if provided, must be 1 or 2)
+    if (formData.section) {
+      const sectionNum = parseInt(formData.section, 10);
+      if (isNaN(sectionNum) || (sectionNum !== 1 && sectionNum !== 2)) {
+        newErrors.section = "Section must be 1 or 2";
+      }
+    }
+
     // Avatar validation (optional, but if provided, validate)
     if (formData.avatar) {
       if (!formData.avatar.type.startsWith("image/")) {
@@ -117,7 +162,7 @@ export default function EditProfilePage() {
   };
 
   const handleInputChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -248,31 +293,63 @@ export default function EditProfilePage() {
       }
 
       // Step 2: Update profile
+      const updatePayload = {
+        bio: formData.bio || null,
+        displayName: formData.displayName || null,
+        avatarUrl,
+        hideProfile: formData.hideProfile,
+        branch: formData.branch || null,
+        section: formData.section || null,
+        year: formData.year || null,
+        instagramUrl: formData.instagramUrl?.trim() || null,
+        linkedinUrl: formData.linkedinUrl?.trim() || null,
+        githubUrl: formData.githubUrl?.trim() || null,
+      };
+
+      console.log("Updating profile with:", updatePayload);
+
       const updateResponse = await fetch("/api/profile/update", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include", // Include cookies for authentication
-        body: JSON.stringify({
-          bio: formData.bio || null,
-          displayName: formData.displayName || null,
-          avatarUrl,
-          hideProfile: formData.hideProfile,
-        }),
+        body: JSON.stringify(updatePayload),
       });
 
       if (!updateResponse.ok) {
         const updateData = await updateResponse.json().catch(() => ({}));
         console.error("Profile update failed:", updateResponse.status, updateData);
+        
+        // Show more detailed error message
+        let errorMessage = updateData.error || "Failed to update profile";
+        if (updateData.details) {
+          errorMessage += `: ${updateData.details}`;
+        }
+        if (updateData.hint) {
+          errorMessage += ` (${updateData.hint})`;
+        }
+        
         setErrors({
-          general: updateData.error || updateData.details || "Failed to update profile",
+          general: errorMessage,
         });
         setSaving(false);
         return;
       }
 
       const updateData = await updateResponse.json();
+      console.log("Profile update response:", updateData);
+
+      // Check for warnings (e.g., social media fields couldn't be saved)
+      if (updateData.warning) {
+        // Show warning but don't block the redirect
+        setErrors({ general: updateData.warning });
+        // Still redirect after a short delay to show the warning
+        setTimeout(() => {
+          window.location.href = `/u/${username}`;
+        }, 3000);
+        return;
+      }
 
       // Step 3: Redirect to profile page after successful update
       // Use window.location for a reliable redirect
@@ -448,6 +525,195 @@ export default function EditProfilePage() {
                 {errors.avatar}
               </p>
             )}
+          </div>
+
+          {/* Branch, Year, and Section */}
+          <div className="space-y-4 rounded-card bg-background-card border border-border p-4">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Academic Information
+            </h2>
+
+            {/* Branch */}
+            <div>
+              <label
+                htmlFor="branch"
+                className="mb-2 block text-sm font-medium text-text-primary"
+              >
+                Branch
+              </label>
+              <select
+                id="branch"
+                name="branch"
+                value={formData.branch}
+                onChange={handleInputChange}
+                aria-invalid={!!errors.branch}
+                aria-describedby={errors.branch ? "branch-error" : undefined}
+                className={`w-full rounded-lg border bg-background px-4 py-2 text-text-primary focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary ${
+                  errors.branch
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                    : "border-border"
+                }`}
+              >
+                <option value="">Select branch</option>
+                {BRANCHES.map((branch) => (
+                  <option key={branch} value={branch}>
+                    {branch}
+                  </option>
+                ))}
+              </select>
+              {errors.branch && (
+                <p
+                  id="branch-error"
+                  className="mt-1 text-sm text-red-400"
+                  role="alert"
+                >
+                  {errors.branch}
+                </p>
+              )}
+            </div>
+
+            {/* Year and Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="year"
+                  className="mb-2 block text-sm font-medium text-text-primary"
+                >
+                  Year
+                </label>
+                <input
+                  type="number"
+                  id="year"
+                  name="year"
+                  min="1"
+                  max="4"
+                  value={formData.year}
+                  onChange={handleInputChange}
+                  aria-invalid={!!errors.year}
+                  aria-describedby={errors.year ? "year-error" : undefined}
+                  className={`w-full rounded-lg border bg-background px-4 py-2 text-text-primary placeholder-text-muted focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary ${
+                    errors.year
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                      : "border-border"
+                  }`}
+                  placeholder="1-4"
+                />
+                {errors.year && (
+                  <p
+                    id="year-error"
+                    className="mt-1 text-sm text-red-400"
+                    role="alert"
+                  >
+                    {errors.year}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="section"
+                  className="mb-2 block text-sm font-medium text-text-primary"
+                >
+                  Section
+                </label>
+                <select
+                  id="section"
+                  name="section"
+                  value={formData.section}
+                  onChange={handleInputChange}
+                  aria-invalid={!!errors.section}
+                  aria-describedby={errors.section ? "section-error" : undefined}
+                  className={`w-full rounded-lg border bg-background px-4 py-2 text-text-primary focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary ${
+                    errors.section
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                      : "border-border"
+                  }`}
+                >
+                  <option value="">Select section</option>
+                  {SECTIONS.map((s) => (
+                    <option key={s} value={s === "none" ? "" : s}>
+                      {s === "none" ? "No Section" : `Section ${s}`}
+                    </option>
+                  ))}
+                </select>
+                {errors.section && (
+                  <p
+                    id="section-error"
+                    className="mt-1 text-sm text-red-400"
+                    role="alert"
+                  >
+                    {errors.section}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Social Media Links */}
+          <div className="space-y-4 rounded-card bg-background-card border border-border p-4">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Social Media Links
+            </h2>
+            <p className="text-sm text-text-muted mb-4">
+              Add links to your social media profiles. These will appear on your profile page.
+            </p>
+
+            {/* Instagram */}
+            <div>
+              <label
+                htmlFor="instagramUrl"
+                className="mb-2 block text-sm font-medium text-text-primary"
+              >
+                Instagram URL
+              </label>
+              <input
+                type="url"
+                id="instagramUrl"
+                name="instagramUrl"
+                value={formData.instagramUrl}
+                onChange={handleInputChange}
+                placeholder="https://instagram.com/yourusername"
+                className="w-full rounded-lg border bg-background px-4 py-2 text-text-primary placeholder-text-muted focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary border-border"
+              />
+            </div>
+
+            {/* LinkedIn */}
+            <div>
+              <label
+                htmlFor="linkedinUrl"
+                className="mb-2 block text-sm font-medium text-text-primary"
+              >
+                LinkedIn URL
+              </label>
+              <input
+                type="url"
+                id="linkedinUrl"
+                name="linkedinUrl"
+                value={formData.linkedinUrl}
+                onChange={handleInputChange}
+                placeholder="https://linkedin.com/in/yourusername"
+                className="w-full rounded-lg border bg-background px-4 py-2 text-text-primary placeholder-text-muted focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary border-border"
+              />
+            </div>
+
+            {/* GitHub */}
+            <div>
+              <label
+                htmlFor="githubUrl"
+                className="mb-2 block text-sm font-medium text-text-primary"
+              >
+                GitHub URL
+              </label>
+              <input
+                type="url"
+                id="githubUrl"
+                name="githubUrl"
+                value={formData.githubUrl}
+                onChange={handleInputChange}
+                placeholder="https://github.com/yourusername"
+                className="w-full rounded-lg border bg-background px-4 py-2 text-text-primary placeholder-text-muted focus:border-text-secondary focus:outline-none focus:ring-2 focus:ring-text-secondary border-border"
+              />
+            </div>
           </div>
 
           {/* Privacy Settings */}

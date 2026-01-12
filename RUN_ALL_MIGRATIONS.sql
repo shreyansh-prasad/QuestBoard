@@ -481,6 +481,18 @@ CREATE POLICY "Anyone can view user scores"
     USING (true);
 
 -- ============================================================================
+-- 10. ADD SOCIAL MEDIA FIELDS TO PROFILES
+-- ============================================================================
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS instagram_url TEXT,
+ADD COLUMN IF NOT EXISTS linkedin_url TEXT,
+ADD COLUMN IF NOT EXISTS github_url TEXT;
+
+COMMENT ON COLUMN public.profiles.instagram_url IS 'Instagram profile URL';
+COMMENT ON COLUMN public.profiles.linkedin_url IS 'LinkedIn profile URL';
+COMMENT ON COLUMN public.profiles.github_url IS 'GitHub profile URL';
+
+-- ============================================================================
 -- VERIFICATION
 -- ============================================================================
 SELECT 
@@ -491,6 +503,14 @@ WHERE table_schema = 'public'
   AND table_type = 'BASE TABLE'
   AND table_name IN ('profiles', 'quests', 'kpis', 'posts', 'follows', 'post_likes', 'profile_likes', 'reports', 'user_scores')
 ORDER BY table_name;
+
+-- Verify social media columns exist
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = 'profiles' 
+  AND column_name IN ('instagram_url', 'linkedin_url', 'github_url')
+ORDER BY column_name;
 
 -- ============================================================================
 -- SUCCESS MESSAGE

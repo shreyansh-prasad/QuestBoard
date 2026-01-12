@@ -28,28 +28,67 @@ async function getProfileData(username: string) {
   }
 
   // Fetch profile - use server client to bypass RLS for check, but filter appropriately
-  const { data: profile, error: profileError } = await supabaseServer
-    .from("profiles")
-    .select(
-      `
-      id,
-      username,
-      display_name,
-      bio,
-      avatar_url,
-      branch,
-      year,
-      section,
-      is_public,
-      created_at,
-      email,
-      user_id
-    `
-    )
-    .eq("username", username)
-    .single();
+  // Use maybeSingle() to handle cases where profile doesn't exist
+  let profile: any = null;
+  let profileError: any = null;
 
-  if (profileError || !profile) {
+  // First try to fetch with social media fields
+  const { data: profileWithSocial, error: errorWithSocial } = await supabaseServer
+    .from("profiles")
+    .select("*")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (errorWithSocial) {
+    // If error is about missing columns, try without social media fields
+    if (errorWithSocial.message?.includes("column") || errorWithSocial.code === "42703") {
+      // Columns don't exist yet, fetch without them
+      const { data: profileBasic, error: errorBasic } = await supabaseServer
+        .from("profiles")
+        .select(`
+          id,
+          username,
+          display_name,
+          bio,
+          avatar_url,
+          branch,
+          year,
+          section,
+          is_public,
+          created_at,
+          email,
+          user_id
+        `)
+        .eq("username", username)
+        .maybeSingle();
+      
+      profile = profileBasic;
+      profileError = errorBasic;
+      // Add null social media fields if they don't exist
+      if (profile) {
+        profile.instagram_url = null;
+        profile.linkedin_url = null;
+        profile.github_url = null;
+      }
+    } else {
+      profileError = errorWithSocial;
+    }
+  } else {
+    profile = profileWithSocial;
+    // Ensure social media fields exist (even if null)
+    if (profile) {
+      profile.instagram_url = profile.instagram_url || null;
+      profile.linkedin_url = profile.linkedin_url || null;
+      profile.github_url = profile.github_url || null;
+    }
+  }
+
+  if (profileError) {
+    console.error("Error fetching profile:", profileError);
+    return null;
+  }
+
+  if (!profile) {
     return null;
   }
 

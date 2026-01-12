@@ -33,11 +33,17 @@ export default function Navigation() {
 
   useEffect(() => {
     // Check auth state
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error) {
+        console.error("Error getting user:", error);
+        return;
+      }
       setUser(user);
       if (user) {
         fetchProfile(user.id);
       }
+    }).catch((error) => {
+      console.error("Error in getUser:", error);
     });
 
     // Listen for auth changes
@@ -52,7 +58,11 @@ export default function Navigation() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
   }, []);
 
   // Refresh profile when pathname changes if profile is missing
@@ -84,21 +94,21 @@ export default function Navigation() {
   const isActive = (path: string) => pathname === path;
 
   const navLinks = [
-    { href: "/", label: "Home", icon: "🏠" },
-    { href: "/explore", label: "Explore", icon: "🔍" },
-    { href: "/leaderboard", label: "Leaderboard", icon: "🏆" },
+    { href: "/", label: "Home" },
+    { href: "/explore", label: "Explore" },
+    { href: "/leaderboard", label: "Leaderboard" },
   ];
 
   const authLinks = user
     ? [
-        { href: profile?.username ? `/u/${profile.username}` : "/u", label: "My Profile", icon: "👤" },
-        { href: "/profile/liked", label: "Liked Profiles", icon: "❤️" },
-        { href: "/quests/new", label: "New Quest", icon: "✨" },
-        { href: "/posts/new", label: "New Post", icon: "➕" },
+        { href: profile?.username ? `/u/${profile.username}` : "/u", label: "My Profile" },
+        { href: "/profile/liked", label: "Liked Profiles" },
+        { href: "/quests/new", label: "New Quest" },
+        { href: "/posts/new", label: "New Post" },
       ]
     : [
-        { href: "/auth/login", label: "Login", icon: "🔐" },
-        { href: "/auth/signup", label: "Sign Up", icon: "📋" },
+        { href: "/auth/login", label: "Login" },
+        { href: "/auth/signup", label: "Sign Up" },
       ];
 
   return (
@@ -111,7 +121,6 @@ export default function Navigation() {
             href="/"
             className="flex items-center gap-2 text-xl font-bold text-white transition-colors hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-gray-900 rounded flex-shrink-0"
           >
-            <span>🎯</span>
             <span>QuestBoard</span>
           </Link>
 
@@ -130,7 +139,6 @@ export default function Navigation() {
                   }`}
                   aria-current={isActive(link.href) ? "page" : undefined}
                 >
-                  <span>{link.icon}</span>
                   <span>{link.label}</span>
                 </Link>
               ))}
@@ -159,7 +167,6 @@ export default function Navigation() {
                       }`}
                       aria-current={isActive(link.href) ? "page" : undefined}
                     >
-                      <span>{link.icon}</span>
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -174,7 +181,6 @@ export default function Navigation() {
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-400 hover:text-gray-300 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-gray-900"
                   aria-label="Sign out"
                 >
-                  <span>🚪</span>
                   <span>Sign Out</span>
                 </button>
               </>
@@ -191,7 +197,6 @@ export default function Navigation() {
                     }`}
                     aria-current={isActive(link.href) ? "page" : undefined}
                   >
-                    <span>{link.icon}</span>
                     <span>{link.label}</span>
                   </Link>
                 ))}
@@ -212,7 +217,7 @@ export default function Navigation() {
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
           >
-            <span className="text-2xl">{menuOpen ? "✕" : "☰"}</span>
+            <span className="text-2xl font-bold">{menuOpen ? "×" : "≡"}</span>
           </button>
         </div>
 
@@ -231,7 +236,6 @@ export default function Navigation() {
                 }`}
                 aria-current={isActive(link.href) ? "page" : undefined}
               >
-                <span>{link.icon}</span>
                 <span>{link.label}</span>
               </Link>
             ))}
@@ -255,7 +259,6 @@ export default function Navigation() {
                       }`}
                       aria-current={isActive(link.href) ? "page" : undefined}
                     >
-                      <span>{link.icon}</span>
                       <span>{link.label}</span>
                     </Link>
                   );
@@ -287,7 +290,6 @@ export default function Navigation() {
                   }`}
                   aria-current={isActive(link.href) ? "page" : undefined}
                 >
-                  <span>{link.icon}</span>
                   <span>{link.label}</span>
                 </Link>
               ))
