@@ -13,6 +13,66 @@ function VerifyEmailContent() {
   const [resending, setResending] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
 
+  const createProfileFromMetadata = async (user: any) => {
+    try {
+      const metadata = user.user_metadata || {};
+      const username = metadata.username;
+      const displayName = metadata.display_name;
+      const branch = metadata.branch;
+      const section = metadata.section;
+      const year = metadata.year;
+      const avatarUrl = metadata.avatar_url;
+
+      // Check if we have required data
+      if (!username || !displayName) {
+        // Missing required data - redirect to profile completion
+        setMessage("Please complete your profile setup...");
+        setTimeout(() => {
+          router.push("/auth/oauth-setup");
+        }, 2000);
+        return;
+      }
+
+      // Create profile via API
+      const response = await fetch("/api/auth/create-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email,
+          username: username,
+          displayName: displayName,
+          branch: branch || null,
+          section: section || null,
+          year: year ? parseInt(String(year), 10) : null,
+          avatarUrl: avatarUrl || null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.profile) {
+        setMessage("Profile created! Redirecting...");
+        setTimeout(() => {
+          router.push(`/u/${result.profile.username}`);
+        }, 2000);
+      } else {
+        // Profile creation failed - redirect to profile completion
+        console.error("Profile creation error:", result);
+        setMessage("Please complete your profile setup...");
+        setTimeout(() => {
+          router.push("/auth/oauth-setup");
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Error creating profile:", error);
+      setMessage("Please complete your profile setup...");
+      setTimeout(() => {
+        router.push("/auth/oauth-setup");
+      }, 2000);
+    }
+  };
+
   useEffect(() => {
     // Listen for auth state changes (Supabase processes URL hash automatically)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -22,20 +82,21 @@ function VerifyEmailContent() {
           setMessage("Email verified successfully! Redirecting...");
           setEmail(session.user.email || null);
           
-          // Fetch profile and redirect
+          // Check if profile exists, if not create it
           supabase
             .from("profiles")
             .select("username")
             .eq("user_id", session.user.id)
             .maybeSingle()
-            .then(({ data: profile }) => {
-              setTimeout(() => {
-                if (profile?.username) {
+            .then(async ({ data: profile, error: profileError }) => {
+              if (profile?.username) {
+                setTimeout(() => {
                   router.push(`/u/${profile.username}`);
-                } else {
-                  router.push("/explore");
-                }
-              }, 2000);
+                }, 2000);
+              } else {
+                // Profile doesn't exist - create it using stored metadata
+                await createProfileFromMetadata(session.user);
+              }
             });
         }
       }
@@ -80,20 +141,21 @@ function VerifyEmailContent() {
           setMessage("Email verified successfully! Redirecting...");
           setEmail(user.email || null);
           
-          // Fetch profile to redirect properly
+          // Check if profile exists, if not create it
           const { data: profile } = await supabase
             .from("profiles")
             .select("username")
             .eq("user_id", user.id)
             .maybeSingle();
           
-          setTimeout(() => {
-            if (profile?.username) {
+          if (profile?.username) {
+            setTimeout(() => {
               router.push(`/u/${profile.username}`);
-            } else {
-              router.push("/explore");
-            }
-          }, 2000);
+            }, 2000);
+          } else {
+            // Profile doesn't exist - create it using stored metadata
+            await createProfileFromMetadata(user);
+          }
           return;
         }
       }
@@ -117,13 +179,14 @@ function VerifyEmailContent() {
             .eq("user_id", retryUser.id)
             .maybeSingle();
           
-          setTimeout(() => {
-            if (profile?.username) {
+          if (profile?.username) {
+            setTimeout(() => {
               router.push(`/u/${profile.username}`);
-            } else {
-              router.push("/explore");
-            }
-          }, 2000);
+            }, 2000);
+          } else {
+            // Profile doesn't exist - create it using stored metadata
+            await createProfileFromMetadata(retryUser);
+          }
           return;
         }
       }
@@ -142,13 +205,14 @@ function VerifyEmailContent() {
           .eq("user_id", user.id)
           .maybeSingle();
         
-        setTimeout(() => {
-          if (profile?.username) {
+        if (profile?.username) {
+          setTimeout(() => {
             router.push(`/u/${profile.username}`);
-          } else {
-            router.push("/explore");
-          }
-        }, 2000);
+          }, 2000);
+        } else {
+          // Profile doesn't exist - create it using stored metadata
+          await createProfileFromMetadata(user);
+        }
         return;
       }
 

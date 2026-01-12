@@ -106,9 +106,9 @@ function LoginForm() {
           .maybeSingle();
 
         if (profileError && profileError.code !== 'PGRST116') {
-          // Profile doesn't exist - redirect to signup completion
+          // Database error - show error
           setErrors({
-            general: "Profile not found. Please complete your signup.",
+            general: "Failed to check profile. Please try again.",
           });
           setLoading(false);
           return;
@@ -117,7 +117,45 @@ function LoginForm() {
         if (profile) {
           router.push(`/u/${profile.username}`);
         } else {
-          router.push("/explore");
+          // Profile doesn't exist - try to create it from metadata or redirect to setup
+          const metadata = data.user.user_metadata || {};
+          const username = metadata.username;
+          const displayName = metadata.display_name;
+
+          if (username && displayName) {
+            // Try to create profile automatically
+            try {
+              const response = await fetch("/api/auth/create-profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  userId: data.user.id,
+                  email: data.user.email,
+                  username: username,
+                  displayName: displayName,
+                  branch: metadata.branch || null,
+                  section: metadata.section || null,
+                  year: metadata.year ? parseInt(String(metadata.year), 10) : null,
+                  avatarUrl: metadata.avatar_url || null,
+                }),
+              });
+
+              const result = await response.json();
+
+              if (response.ok && result.profile) {
+                router.push(`/u/${result.profile.username}`);
+              } else {
+                // Profile creation failed - redirect to setup
+                router.push("/auth/oauth-setup");
+              }
+            } catch (error) {
+              console.error("Error creating profile:", error);
+              router.push("/auth/oauth-setup");
+            }
+          } else {
+            // Missing metadata - redirect to profile setup
+            router.push("/auth/oauth-setup");
+          }
         }
       }
     } catch (error) {

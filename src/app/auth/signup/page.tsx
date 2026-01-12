@@ -97,7 +97,10 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // Step 1: Sign up with Supabase Auth
+      // Avatar will be uploaded after signup (we need user ID first)
+      let finalAvatarUrl: string | null = null;
+
+      // Step 2: Sign up with Supabase Auth
       // Include emailRedirectTo for email verification callback
       const siteUrl = typeof window !== 'undefined' 
         ? window.location.origin 
@@ -111,6 +114,11 @@ export default function SignupPage() {
           data: {
             username: formData.username.trim(),
             display_name: formData.displayName.trim(),
+            branch: formData.branch,
+            section: formData.section,
+            year: formData.year,
+            // Store avatar file info - we'll upload it after email verification
+            has_avatar: !!avatarFile,
           },
         },
       });
@@ -127,6 +135,39 @@ export default function SignupPage() {
         return;
       }
 
+      // Step 3: Upload avatar if provided (now that we have user ID)
+      if (avatarFile && authData.user.id) {
+        try {
+          const avatarFormData = new FormData();
+          avatarFormData.append("file", avatarFile);
+          avatarFormData.append("userId", authData.user.id);
+
+          const avatarResponse = await fetch("/api/auth/upload-avatar", {
+            method: "POST",
+            body: avatarFormData,
+          });
+
+          if (avatarResponse.ok) {
+            const avatarResult = await avatarResponse.json();
+            finalAvatarUrl = avatarResult.url;
+            
+            // Update user metadata with avatar URL
+            await supabase.auth.updateUser({
+              data: {
+                ...authData.user.user_metadata,
+                avatar_url: finalAvatarUrl,
+              },
+            });
+          } else {
+            console.error("Avatar upload failed, but continuing with signup");
+            // Don't fail signup if avatar upload fails
+          }
+        } catch (avatarError: any) {
+          console.error("Avatar upload error:", avatarError);
+          // Don't fail signup if avatar upload fails
+        }
+      }
+
       // Check if email confirmation is required
       // If email_confirmed_at is null, Supabase is requiring email verification
       const emailConfirmed = authData.user.email_confirmed_at !== null;
@@ -139,8 +180,8 @@ export default function SignupPage() {
       setShowEmailModal(true);
       setLoading(false);
       
-      // Don't create profile yet - user needs to verify email first
-      // Profile will be created after email verification via login
+      // Profile will be created automatically after email verification
+      // The verify page will check for profile and create it using stored metadata
       return;
 
       // NOTE: The following code is unreachable (dead code after return above)

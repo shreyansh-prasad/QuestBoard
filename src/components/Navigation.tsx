@@ -14,20 +14,29 @@ export default function Navigation() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
 
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("username, display_name, avatar_url")
+      .eq("user_id", userId)
+      .maybeSingle();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error("Error fetching profile:", error);
+    }
+    if (data) {
+      setProfile(data);
+    } else {
+      setProfile(null);
+    }
+  };
+
   useEffect(() => {
     // Check auth state
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       if (user) {
-        // Fetch profile to get username
-        supabase
-          .from("profiles")
-          .select("username, display_name, avatar_url")
-          .eq("user_id", user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data);
-          });
+        fetchProfile(user.id);
       }
     });
 
@@ -37,14 +46,7 @@ export default function Navigation() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        supabase
-          .from("profiles")
-          .select("username, display_name, avatar_url")
-          .eq("user_id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data);
-          });
+        fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
@@ -52,6 +54,20 @@ export default function Navigation() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Refresh profile when pathname changes if profile is missing
+  // This ensures the profile link appears after profile creation
+  useEffect(() => {
+    if (user?.id && !profile) {
+      // If user is logged in but profile is missing, try fetching again
+      // This handles the case where profile was just created
+      const timer = setTimeout(() => {
+        fetchProfile(user.id);
+      }, 1000); // Small delay to allow profile creation to complete
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, user?.id]);
 
   const handleSignOut = () => {
     setShowSignOutModal(true);
@@ -89,7 +105,7 @@ export default function Navigation() {
     <>
       <nav className="sticky top-0 z-50 border-b border-border bg-black">
         <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center w-full">
+        <div className="flex h-16 items-center w-full justify-between">
           {/* Logo/Brand */}
           <Link
             href="/"
@@ -184,7 +200,7 @@ export default function Navigation() {
             </div>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button - Pushed to extreme right */}
           <button
             type="button"
             onClick={(e) => {
@@ -192,7 +208,7 @@ export default function Navigation() {
               e.stopPropagation();
               setMenuOpen(!menuOpen);
             }}
-            className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-card transition-colors focus:outline-none focus:ring-2 focus:ring-text-secondary focus:ring-offset-2 focus:ring-offset-background"
+            className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-card transition-colors focus:outline-none focus:ring-2 focus:ring-text-secondary focus:ring-offset-2 focus:ring-offset-background ml-auto"
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
           >
