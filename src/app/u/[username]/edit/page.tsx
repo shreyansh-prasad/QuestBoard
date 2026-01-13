@@ -306,8 +306,6 @@ export default function EditProfilePage() {
         githubUrl: formData.githubUrl?.trim() || null,
       };
 
-      console.log("Updating profile with:", updatePayload);
-
       const updateResponse = await fetch("/api/profile/update", {
         method: "PUT",
         headers: {
@@ -338,7 +336,6 @@ export default function EditProfilePage() {
       }
 
       const updateData = await updateResponse.json();
-      console.log("Profile update response:", updateData);
 
       // Check for warnings (e.g., social media fields couldn't be saved)
       if (updateData.warning) {

@@ -183,46 +183,6 @@ export default function SignupPage() {
       // Profile will be created automatically after email verification
       // The verify page will check for profile and create it using stored metadata
       return;
-
-      // NOTE: The following code is unreachable (dead code after return above)
-      // It's kept for reference but will never execute.
-      // Profile creation happens after email verification via the login flow.
-      /*
-      // Step 4: Create profile via API (only if email is confirmed)
-      const profileResponse = await fetch("/api/auth/create-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: authData.user.id,
-          email: formData.email.trim(),
-          username: formData.username.trim(),
-          displayName: formData.displayName.trim(),
-          branch: formData.branch,
-          section: formData.section,
-          year: parseInt(formData.year, 10),
-          avatarUrl: finalAvatarUrl,
-        }),
-      });
-
-      const profileResult = await profileResponse.json();
-
-      if (!profileResponse.ok) {
-        // Show detailed error message
-        const errorMessage = profileResult.details 
-          ? `${profileResult.error}: ${profileResult.details}`
-          : profileResult.error || "Failed to create profile. Please try again.";
-        
-        setErrors({
-          general: errorMessage + (profileResult.hint ? ` (${profileResult.hint})` : ""),
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Step 5: Redirect to profile edit after successful profile creation
-      setLoading(false);
-      router.push(`/u/${profileResult.profile.username}/edit`);
-      */
     } catch (error) {
       console.error("Signup error:", error);
       setErrors({

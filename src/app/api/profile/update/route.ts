@@ -88,20 +88,15 @@ export async function PUT(request: NextRequest) {
     if (instagramUrl !== undefined) {
       const trimmedUrl = instagramUrl?.trim() || null;
       updateData.instagram_url = trimmedUrl && trimmedUrl.length > 0 ? trimmedUrl : null;
-      console.log("Setting instagram_url:", updateData.instagram_url);
     }
     if (linkedinUrl !== undefined) {
       const trimmedUrl = linkedinUrl?.trim() || null;
       updateData.linkedin_url = trimmedUrl && trimmedUrl.length > 0 ? trimmedUrl : null;
-      console.log("Setting linkedin_url:", updateData.linkedin_url);
     }
     if (githubUrl !== undefined) {
       const trimmedUrl = githubUrl?.trim() || null;
       updateData.github_url = trimmedUrl && trimmedUrl.length > 0 ? trimmedUrl : null;
-      console.log("Setting github_url:", updateData.github_url);
     }
-
-    console.log("Updating profile with data:", JSON.stringify(updateData, null, 2));
 
     // Update all fields in one operation
     const { data: updatedProfile, error: updateError } = await supabaseServer
